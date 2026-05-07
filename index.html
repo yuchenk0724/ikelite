@@ -245,7 +245,7 @@
       </div>
       <input type="file" id="import-customer" accept=".csv" style="display:none" onchange="importCSV(event,'customer')">
       <div class="toolbar"><div class="search-wrap"><span class="search-icon">🔍</span><input id="customer-search" placeholder="搜尋客戶名稱或電話…" oninput="renderCustomers()"></div></div>
-      <div class="card"><table><thead><tr><th>客戶編號</th><th>客戶名稱</th><th>聯絡人</th><th>電話</th><th>Email</th><th>地址</th><th>備註</th><th>操作</th></tr></thead><tbody id="customer-tbody"></tbody></table></div>
+      <div class="card"><table><thead><tr><th>客戶編號</th><th>客戶名稱</th><th>統一編號</th><th>聯絡人</th><th>電話</th><th>傳真</th><th>Email</th><th>地址</th><th>備註</th><th>操作</th></tr></thead><tbody id="customer-tbody"></tbody></table></div>
     </div>
 
     <!-- Reports -->
@@ -282,7 +282,7 @@
     <div class="modal-title">新增進貨</div>
     <div class="form-row"><div class="form-group"><label>日期 *</label><input id="pu-date" type="date"></div><div class="form-group"><label>廠商</label><input id="pu-vendor" placeholder="供應商名稱"></div></div>
     <div class="form-group"><label>商品 *</label><select id="pu-product"><option value="">-- 選擇商品 --</option></select></div>
-    <div class="form-row"><div class="form-group"><label>數量 *</label><input id="pu-qty" type="number" min="1" placeholder="0"></div><div class="form-group"><label>進貨單價 (NT$)</label><input id="pu-price" type="number" min="0" placeholder="0"></div></div>
+    <div class="form-row"><div class="form-group"><label>數量 *</label><input id="pu-qty" type="number" min="1" placeholder="0"></div><div class="form-group"><label>進貨單價 (NT$)</label><input id="pu-price" type="number" min="0" step="0.01" placeholder="0.00"></div></div>
     <div class="form-group"><label>備註</label><input id="pu-note" placeholder="選填"></div>
     <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('purchase')">取消</button><button class="btn btn-primary" onclick="savePurchase()">儲存</button></div>
   </div>
@@ -291,9 +291,14 @@
 <div class="modal-overlay" id="modal-sales">
   <div class="modal">
     <div class="modal-title">新增銷貨</div>
-    <div class="form-row"><div class="form-group"><label>日期 *</label><input id="sa-date" type="date"></div><div class="form-group"><label>客戶</label><input id="sa-customer" placeholder="客戶名稱"></div></div>
+    <div class="form-row"><div class="form-group"><label>日期 *</label><input id="sa-date" type="date"></div><div class="form-group"><label>客戶</label>
+      <select id="sa-customer-sel" onchange="fillCustomerInfo()"><option value="">-- 選擇客戶（選填）--</option></select>
+    </div></div>
+    <div id="sa-customer-info" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:var(--text2);line-height:1.8;">
+      <span id="sa-info-taxid"></span><span id="sa-info-fax"></span>
+    </div>
     <div class="form-group"><label>商品 *</label><select id="sa-product"><option value="">-- 選擇商品 --</option></select></div>
-    <div class="form-row"><div class="form-group"><label>數量 *</label><input id="sa-qty" type="number" min="1" placeholder="0"></div><div class="form-group"><label>銷售單價 (NT$)</label><input id="sa-price" type="number" min="0" placeholder="0"></div></div>
+    <div class="form-row"><div class="form-group"><label>數量 *</label><input id="sa-qty" type="number" min="1" placeholder="0"></div><div class="form-group"><label>銷售單價 (NT$)</label><input id="sa-price" type="number" min="0" step="0.01" placeholder="0.00"></div></div>
     <div class="form-group"><label>備註</label><input id="sa-note" placeholder="選填"></div>
     <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('sales')">取消</button><button class="btn btn-primary" onclick="saveSales()">儲存</button></div>
   </div>
@@ -305,6 +310,7 @@
     <input type="hidden" id="customer-edit-id">
     <div class="form-row"><div class="form-group"><label>客戶編號</label><input id="c-code" placeholder="如 C001"></div><div class="form-group"><label>客戶名稱 *</label><input id="c-name" placeholder="公司或個人名稱"></div></div>
     <div class="form-row"><div class="form-group"><label>聯絡人</label><input id="c-contact" placeholder="聯絡人姓名"></div><div class="form-group"><label>電話</label><input id="c-phone" placeholder="0912-345-678"></div></div>
+    <div class="form-row"><div class="form-group"><label>統一編號</label><input id="c-taxid" placeholder="12345678"></div><div class="form-group"><label>傳真</label><input id="c-fax" placeholder="02-1234-5678"></div></div>
     <div class="form-group"><label>Email</label><input id="c-email" type="email" placeholder="email@example.com"></div>
     <div class="form-group"><label>地址</label><input id="c-addr" placeholder="完整地址"></div>
     <div class="form-group"><label>備註</label><input id="c-note" placeholder="選填"></div>
@@ -450,7 +456,18 @@ function openModal(type){
       else document.getElementById('sa-price').value=o?.dataset?.price||'';
     };
     document.getElementById(pre+'-date').value=new Date().toISOString().slice(0,10);
-    ['pu-vendor','pu-qty','pu-note','sa-customer','sa-qty','sa-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    ['pu-vendor','pu-qty','pu-note','sa-qty','sa-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    if(type==='sales'){
+      const csel=document.getElementById('sa-customer-sel');
+      csel.innerHTML='<option value="">-- 選擇客戶（選填）--</option>';
+      cache.customers.forEach(c=>{
+        const o=document.createElement('option');
+        o.value=c.id; o.textContent=c.name+(c.code?` (${c.code})`:'');
+        o.dataset.taxid=c.taxid||''; o.dataset.fax=c.fax||''; o.dataset.name=c.name;
+        csel.appendChild(o);
+      });
+      document.getElementById('sa-customer-info').style.display='none';
+    }
   }
   document.getElementById('modal-'+type).classList.add('open');
 }
@@ -524,8 +541,8 @@ function renderPurchase(){
   if(!list.length){tbody.innerHTML=`<tr><td colspan="8"><div class="empty"><div class="empty-icon">🛒</div>尚無進貨紀錄</div></td></tr>`;return;}
   tbody.innerHTML=list.map(r=>`<tr>
     <td class="mono">${r.date}</td><td>${r.pname}</td><td>${r.vendor||'-'}</td>
-    <td class="mono">${r.qty}</td><td class="mono">NT$ ${(+r.price).toLocaleString()}</td>
-    <td class="mono"><strong>NT$ ${(r.qty*r.price).toLocaleString()}</strong></td>
+    <td class="mono">${r.qty}</td><td class="mono">NT$ ${fmtMoney(r.price)}</td>
+    <td class="mono"><strong>NT$ ${fmtMoney(r.qty*r.price)}</strong></td>
     <td>${r.note||'-'}</td><td><button class="btn btn-danger btn-sm" onclick="deletePurchase('${r.id}')">🗑️</button></td>
   </tr>`).join('');
 }
@@ -539,8 +556,11 @@ async function saveSales(){
   const product=cache.products.find(p=>p.id===pid);
   if(product.stock<qty)return alert(`庫存不足！目前庫存：${product.stock}`);
   const price=+document.getElementById('sa-price').value||0;
+  const csel=document.getElementById('sa-customer-sel');
+  const copt=csel.selectedOptions[0];
+  const customerName=copt?.value ? copt.dataset.name : '';
   try{
-    const row=await dbInsert('sales',{date,pid,pname:product.name,customer:document.getElementById('sa-customer').value.trim(),qty,price,note:document.getElementById('sa-note').value.trim()});
+    const row=await dbInsert('sales',{date,pid,pname:product.name,customer:customerName,qty,price,note:document.getElementById('sa-note').value.trim()});
     cache.sales.unshift(row);
     const ns=+product.stock-qty;
     await dbUpdate('products',pid,{stock:ns});product.stock=ns;
@@ -558,8 +578,8 @@ function renderSales(){
   if(!list.length){tbody.innerHTML=`<tr><td colspan="8"><div class="empty"><div class="empty-icon">💰</div>尚無銷貨紀錄</div></td></tr>`;return;}
   tbody.innerHTML=list.map(r=>`<tr>
     <td class="mono">${r.date}</td><td>${r.pname}</td><td>${r.customer||'-'}</td>
-    <td class="mono">${r.qty}</td><td class="mono">NT$ ${(+r.price).toLocaleString()}</td>
-    <td class="mono"><strong>NT$ ${(r.qty*r.price).toLocaleString()}</strong></td>
+    <td class="mono">${r.qty}</td><td class="mono">NT$ ${fmtMoney(r.price)}</td>
+    <td class="mono"><strong>NT$ ${fmtMoney(r.qty*r.price)}</strong></td>
     <td>${r.note||'-'}</td><td><button class="btn btn-danger btn-sm" onclick="deleteSales('${r.id}')">🗑️</button></td>
   </tr>`).join('');
 }
@@ -568,14 +588,14 @@ function renderSales(){
 function openCustomerModal(){
   document.getElementById('customer-edit-id').value='';
   document.getElementById('customer-modal-title').textContent='新增客戶';
-  ['c-code','c-name','c-contact','c-phone','c-email','c-addr','c-note'].forEach(id=>document.getElementById(id).value='');
+  ['c-code','c-name','c-contact','c-phone','c-taxid','c-fax','c-email','c-addr','c-note'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('modal-customer').classList.add('open');
 }
 async function saveCustomer(){
   const id=document.getElementById('customer-edit-id').value;
   const name=document.getElementById('c-name').value.trim();
   if(!name)return alert('請填寫客戶名稱');
-  const obj={code:document.getElementById('c-code').value.trim(),name,contact:document.getElementById('c-contact').value.trim(),phone:document.getElementById('c-phone').value.trim(),email:document.getElementById('c-email').value.trim(),addr:document.getElementById('c-addr').value.trim(),note:document.getElementById('c-note').value.trim()};
+  const obj={code:document.getElementById('c-code').value.trim(),name,contact:document.getElementById('c-contact').value.trim(),phone:document.getElementById('c-phone').value.trim(),taxid:document.getElementById('c-taxid').value.trim(),fax:document.getElementById('c-fax').value.trim(),email:document.getElementById('c-email').value.trim(),addr:document.getElementById('c-addr').value.trim(),note:document.getElementById('c-note').value.trim()};
   try{
     if(id){await dbUpdate('customers',id,obj);Object.assign(cache.customers.find(c=>c.id===id),obj);}
     else{const row=await dbInsert('customers',obj);cache.customers.unshift(row);}
@@ -588,6 +608,7 @@ function editCustomer(id){
   document.getElementById('customer-modal-title').textContent='編輯客戶';
   document.getElementById('c-code').value=c.code||'';document.getElementById('c-name').value=c.name;
   document.getElementById('c-contact').value=c.contact||'';document.getElementById('c-phone').value=c.phone||'';
+  document.getElementById('c-taxid').value=c.taxid||'';document.getElementById('c-fax').value=c.fax||'';
   document.getElementById('c-email').value=c.email||'';document.getElementById('c-addr').value=c.addr||'';
   document.getElementById('c-note').value=c.note||'';
   document.getElementById('modal-customer').classList.add('open');
@@ -602,13 +623,27 @@ function renderCustomers(){
   const tbody=document.getElementById('customer-tbody');
   if(!list.length){tbody.innerHTML=`<tr><td colspan="8"><div class="empty"><div class="empty-icon">👥</div>尚無客戶資料</div></td></tr>`;return;}
   tbody.innerHTML=list.map(c=>`<tr>
-    <td class="mono">${c.code||'-'}</td><td><strong>${c.name}</strong></td><td>${c.contact||'-'}</td>
-    <td class="mono">${c.phone||'-'}</td><td>${c.email||'-'}</td><td>${c.addr||'-'}</td><td>${c.note||'-'}</td>
+    <td class="mono">${c.code||'-'}</td><td><strong>${c.name}</strong></td><td class="mono">${c.taxid||'-'}</td><td>${c.contact||'-'}</td>
+    <td class="mono">${c.phone||'-'}</td><td class="mono">${c.fax||'-'}</td><td>${c.email||'-'}</td><td>${c.addr||'-'}</td><td>${c.note||'-'}</td>
     <td style="display:flex;gap:6px;"><button class="btn btn-ghost btn-sm" onclick="editCustomer('${c.id}')">✏️ 編輯</button><button class="btn btn-danger btn-sm" onclick="deleteCustomer('${c.id}')">🗑️</button></td>
   </tr>`).join('');
 }
 
-// ── Dashboard ──────────────────────────────────────────────────────────
+function fillCustomerInfo(){
+  const sel=document.getElementById('sa-customer-sel');
+  const o=sel.selectedOptions[0];
+  const infoEl=document.getElementById('sa-customer-info');
+  if(!o||!o.value){infoEl.style.display='none';return;}
+  const parts=[];
+  if(o.dataset.taxid) parts.push(`統一編號：${o.dataset.taxid}`);
+  if(o.dataset.fax) parts.push(`傳真：${o.dataset.fax}`);
+  document.getElementById('sa-info-taxid').textContent=parts[0]||'';
+  document.getElementById('sa-info-fax').textContent=parts[1]?' ｜ '+parts[1]:'';
+  infoEl.style.display=parts.length?'block':'none';
+}
+
+// ── Format money ───────────────────────────────────────────────────────
+function fmtMoney(n){ return (+n).toLocaleString('zh-TW',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function renderDashboard(){
   const now=new Date(); const ym=now.toISOString().slice(0,7);
   document.getElementById('dash-date').textContent=now.toLocaleDateString('zh-TW',{year:'numeric',month:'long',day:'numeric',weekday:'long'});
@@ -618,8 +653,8 @@ function renderDashboard(){
   const ts=ms.reduce((s,r)=>s+r.qty*r.price,0);
   const lc=cache.products.filter(p=>p.stock<=p.safe).length;
   document.getElementById('stat-products').textContent=cache.products.length;
-  document.getElementById('stat-purchase').textContent='NT$'+tp.toLocaleString();
-  document.getElementById('stat-sales').textContent='NT$'+ts.toLocaleString();
+  document.getElementById('stat-purchase').textContent='NT$'+fmtMoney(tp);
+  document.getElementById('stat-sales').textContent='NT$'+fmtMoney(ts);
   document.getElementById('stat-low').textContent=lc;
   document.getElementById('low-stock-alert').style.display=lc>0?'flex':'none';
   const sorted=[...cache.products].sort((a,b)=>b.stock-a.stock).slice(0,6);
@@ -631,7 +666,7 @@ function renderDashboard(){
   const rs=[...cache.sales].slice(0,5);
   document.getElementById('dash-recent-sales').innerHTML=rs.length?rs.map(r=>`
     <div class="recent-row"><div><div>${r.pname}</div><div class="recent-meta">${r.date}${r.customer?' · '+r.customer:''}</div></div>
-    <div class="mono" style="color:var(--accent2)">NT$ ${(r.qty*r.price).toLocaleString()}</div></div>`).join(''):'<div class="empty"><div class="empty-icon">💰</div>尚無銷貨紀錄</div>';
+    <div class="mono" style="color:var(--accent2)">NT$ ${fmtMoney(r.qty*r.price)}</div></div>`).join(''):'<div class="empty"><div class="empty-icon">💰</div>尚無銷貨紀錄</div>';
 }
 
 // ── Reports ────────────────────────────────────────────────────────────
@@ -639,9 +674,9 @@ function renderReports(){
   const ym=new Date().toISOString().slice(0,7);
   const tp=cache.purchases.filter(r=>r.date?.startsWith(ym)).reduce((s,r)=>s+r.qty*r.price,0);
   const ts=cache.sales.filter(r=>r.date?.startsWith(ym)).reduce((s,r)=>s+r.qty*r.price,0);
-  document.getElementById('rep-purchase').textContent='NT$'+tp.toLocaleString();
-  document.getElementById('rep-sales').textContent='NT$'+ts.toLocaleString();
-  document.getElementById('rep-profit').textContent='NT$'+(ts-tp).toLocaleString();
+  document.getElementById('rep-purchase').textContent='NT$'+fmtMoney(tp);
+  document.getElementById('rep-sales').textContent='NT$'+fmtMoney(ts);
+  document.getElementById('rep-profit').textContent='NT$'+fmtMoney(ts-tp);
   const tbody=document.getElementById('report-tbody');
   if(!cache.products.length){tbody.innerHTML=`<tr><td colspan="5"><div class="empty"><div class="empty-icon">📊</div>尚無資料</div></td></tr>`;return;}
   tbody.innerHTML=cache.products.map(p=>{
@@ -650,14 +685,14 @@ function renderReports(){
     const sAmt=cache.sales.filter(r=>r.pid===p.id).reduce((s,r)=>s+r.qty*r.price,0);
     return`<tr><td>${p.name}</td><td class="mono">${pIn} ${p.unit}</td><td class="mono">${sOut} ${p.unit}</td>
       <td><span class="badge ${p.stock<=p.safe?'badge-red':'badge-green'}">${p.stock} ${p.unit}</span></td>
-      <td class="mono">NT$ ${sAmt.toLocaleString()}</td></tr>`;
+      <td class="mono">NT$ ${fmtMoney(sAmt)}</td></tr>`;
   }).join('');
 }
 
 // ── CSV ────────────────────────────────────────────────────────────────
 const TMPL={
-  product:{headers:['商品編號','商品名稱','類別','單位','成本價','售價','庫存','安全庫存量'],sample:[['P001','範例商品A','電子','個','100','150','50','10']]},
-  customer:{headers:['客戶編號','客戶名稱','聯絡人','電話','Email','地址','備註'],sample:[['C001','範例公司A','王小明','0912-345-678','wang@example.com','台北市信義區','VIP客戶']]}
+  product:{headers:['商品編號','商品名稱','類別','單位','成本價','售價','庫存','安全庫存量'],sample:[['P001','範例商品A','電子','個','100','150','50','10'],['P002','範例商品B','食品','箱','200','280','30','5']]},
+  customer:{headers:['客戶編號','客戶名稱','聯絡人','電話','統一編號','傳真','Email','地址','備註'],sample:[['C001','範例公司A','王小明','0912-345-678','12345678','02-1234-5678','wang@example.com','台北市信義區','VIP客戶']]}
 };
 function esc(v){const s=String(v??'');return s.includes(',')||s.includes('"')||s.includes('\n')?`"${s.replace(/"/g,'""')}"`:s;}
 function toCSV(rows){return rows.map(r=>r.map(esc).join(',')).join('\r\n');}
@@ -666,7 +701,7 @@ function downloadTemplate(type){const t=TMPL[type];dlCSV(`${type==='product'?'�
 function exportCSV(type){
   const d=new Date().toISOString().slice(0,10);
   if(type==='product') dlCSV(`商品清單_${d}.csv`,toCSV([TMPL.product.headers,...cache.products.map(p=>[p.code,p.name,p.cat,p.unit,p.cost,p.price,p.stock,p.safe])]));
-  else if(type==='customer') dlCSV(`客戶清單_${d}.csv`,toCSV([TMPL.customer.headers,...cache.customers.map(c=>[c.code,c.name,c.contact,c.phone,c.email,c.addr,c.note])]));
+  else if(type==='customer') dlCSV(`客戶清單_${d}.csv`,toCSV([TMPL.customer.headers,...cache.customers.map(c=>[c.code,c.name,c.contact,c.phone,c.taxid||'',c.fax||'',c.email,c.addr,c.note])]));
   else if(type==='purchase') dlCSV(`進貨紀錄_${d}.csv`,toCSV([['日期','商品','廠商','數量','單價','小計','備註'],...cache.purchases.map(r=>[r.date,r.pname,r.vendor,r.qty,r.price,r.qty*r.price,r.note])]));
   else if(type==='sales') dlCSV(`銷貨紀錄_${d}.csv`,toCSV([['日期','商品','客戶','數量','單價','小計','備註'],...cache.sales.map(r=>[r.date,r.pname,r.customer,r.qty,r.price,r.qty*r.price,r.note])]));
 }
@@ -686,26 +721,45 @@ function parseCSV(text){
 async function importCSV(event,type){
   const file=event.target.files[0];if(!file)return;
   event.target.value='';
-  const text=await file.text();
+
+  // 顯示載入中提示
+  document.getElementById('import-result-body').innerHTML='<div style="text-align:center;padding:20px;">⏳ 匯入中，請稍候…</div>';
+  document.getElementById('modal-import-result').classList.add('open');
+
+  let text;
+  try{ text=await file.text(); }
+  catch(e){ document.getElementById('import-result-body').innerHTML='<div style="color:var(--danger)">❌ 無法讀取檔案，請確認格式為 CSV</div>'; return; }
+
   const rows=parseCSV(text);
-  if(rows.length<2)return alert('檔案內容不足，請確認格式');
-  let added=0,skipped=0;
-  try{
-    for(const r of rows.slice(1)){
-      const name=r[1]?.trim();if(!name){skipped++;continue;}
+  if(rows.length<2){
+    document.getElementById('import-result-body').innerHTML='<div style="color:var(--danger)">❌ 檔案內容不足，至少需要標題列加一筆資料</div>';
+    return;
+  }
+
+  let added=0,skipped=0,errors=[];
+  for(const r of rows.slice(1)){
+    const name=r[1]?.trim();
+    if(!name){skipped++;continue;}
+    try{
       if(type==='product'){
         const row=await dbInsert('products',{code:r[0]?.trim()||'',name,cat:r[2]?.trim()||'',unit:r[3]?.trim()||'個',cost:+r[4]||0,price:+r[5]||0,stock:+r[6]||0,safe:+r[7]||5});
         cache.products.unshift(row);
       }else{
-        const row=await dbInsert('customers',{code:r[0]?.trim()||'',name,contact:r[2]?.trim()||'',phone:r[3]?.trim()||'',email:r[4]?.trim()||'',addr:r[5]?.trim()||'',note:r[6]?.trim()||''});
+        // 客戶範本：編號,名稱,聯絡人,電話,統編,傳真,Email,地址,備註
+        const row=await dbInsert('customers',{code:r[0]?.trim()||'',name,contact:r[2]?.trim()||'',phone:r[3]?.trim()||'',taxid:r[4]?.trim()||'',fax:r[5]?.trim()||'',email:r[6]?.trim()||'',addr:r[7]?.trim()||'',note:r[8]?.trim()||''});
         cache.customers.unshift(row);
       }
       added++;
-    }
-    if(type==='product'){renderProducts();renderDashboard();}else renderCustomers();
-    document.getElementById('import-result-body').innerHTML=`<div>✅ <strong>成功匯入 ${added} 筆資料</strong></div>${skipped?`<div style="color:var(--warning);margin-top:8px;">⚠️ 略過 ${skipped} 筆（缺少名稱）</div>`:''}`;
-    document.getElementById('modal-import-result').classList.add('open');
-  }catch(e){alert('匯入失敗：'+e.message);}
+    }catch(e){ errors.push(`${name}：${e.message}`); }
+  }
+
+  if(type==='product'){renderProducts();renderDashboard();}else renderCustomers();
+
+  let html=`<div style="margin-bottom:8px;">✅ <strong>成功匯入 ${added} 筆資料</strong></div>`;
+  if(skipped) html+=`<div style="color:var(--warning);margin-bottom:6px;">⚠️ 略過 ${skipped} 筆（缺少名稱）</div>`;
+  if(errors.length) html+=`<div style="color:var(--danger);margin-bottom:6px;">❌ 失敗 ${errors.length} 筆：<br>${errors.slice(0,3).join('<br>')}${errors.length>3?'…':''}</div>`;
+  html+=`<div style="font-size:12px;color:var(--text2);margin-top:10px;">來源檔案：${file.name}</div>`;
+  document.getElementById('import-result-body').innerHTML=html;
 }
 
 document.getElementById('auth-password').addEventListener('keydown',e=>{if(e.key==='Enter')handleAuth();});
